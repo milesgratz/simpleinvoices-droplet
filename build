@@ -25,15 +25,20 @@ then
   # define mysql root password
   read -p "Please specify MySQL root password: " mysqlpwd
 
-  # echo mysql root password to /var/cache/debconf/passwords.dat to prevent 'apt-get install mysql-server' prompting for root password
+  # echo mysql root password to /var/cache/debconf/passwords.dat to prevent 'mysql-server' and 'phpmyadmin' prompting for root password
   echo mysql-server mysql-server/root_password password $mysqlpwd | debconf-set-selections
   echo mysql-server mysql-server/root_password_again password $mysqlpwd | debconf-set-selections
+  echo phpmyadmin phpmyadmin/dbconfig-install boolean true | debconf-set-selections
+  echo phpmyadmin phpmyadmin/app-password-confirm password $mysqlpwd | debconf-set-selections
+  echo phpmyadmin phpmyadmin/mysql/admin-pass password $mysqlpwd | debconf-set-selections
+  echo phpmyadmin phpmyadmin/mysql/app-pass password $mysqlpwd | debconf-set-selections
+  echo phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2 | debconf-set-selections
 
   # download simpleinvoices2011.1 (stable release) zip
   wget https://bitbucket.org/simpleinvoices/simpleinvoices/downloads/simpleinvoices.2011.1.zip
 
   # update and install lamp-server unzip
-  apt-get upgrade && apt-get -y install unzip apache2 mysql-server php5 php-pear php5-mysql
+  apt-get update && apt-get -y install unzip apache2 mysql-server php5 php-pear php5-mysql phpmyadmin
 
   # unzip simpleinvoices2011.1 to /var/www/html
   unzip simpleinvoices.2011.1.zip -d /var/www/
@@ -104,6 +109,9 @@ then
   # disable default site (000-default.conf) and enable simpleinvoices.conf
   a2dissite 000-default
   a2ensite simpleinvoices
+ 
+  # enable php5-mcrypt extension
+  php5enmod mcrypt
 
   # fix mysql password for simpleinvoices config.ini
   sed -i -e "10s/$/\"$mysqlpwd\"/" /var/www/simpleinvoices/config/config.ini
