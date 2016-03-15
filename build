@@ -55,7 +55,7 @@ then
 
   # create simpleinvoices database, grant privileges, etc
   mysql --user="root" --password="$mysqlpwd" --execute="CREATE DATABASE simple_invoices;"
-  mysql --user="root" --password="$mysqlpwd" --execute="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP ON simple_invoices.* TO 'simple_invoices'@'localhost' IDENTIFIED BY   '"$mysqlpwd"';"
+  mysql --user="root" --password="$mysqlpwd" --execute="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP ON simple_invoices.* TO 'simple_invoices'@'localhost' IDENTIFIED BY '$mysqlpwd';"
   mysql --user="root" --password="$mysqlpwd" --execute="FLUSH PRIVILEGES;"
 
   # create required database tables from simpleinvoices.2011.1.zip extract
