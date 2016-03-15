@@ -47,10 +47,10 @@ then
   chown www-data:www-data /var/www/simpleinvoices
 
   # run "mysql_secure_installation"
-  mysql --user="root" --password="$mysqlpwd" -e "UPDATE mysql.user SET Password=PASSWORD('"$mysqlpwd"') WHERE User='root'"
-  mysql --user="root" --password="$mysqlpwd" -e "DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
-  mysql --user="root" --password="$mysqlpwd" -e "DELETE FROM mysql.user WHERE User=''"
-  mysql --user="root" --password="$mysqlpwd" -e "DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
+  mysql --user="root" --password="$mysqlpwd" --execute="UPDATE mysql.user SET Password=PASSWORD('$mysqlpwd') WHERE User='root'"
+  mysql --user="root" --password="$mysqlpwd" --execute="DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+  mysql --user="root" --password="$mysqlpwd" --execute="DELETE FROM mysql.user WHERE User=''"
+  mysql --user="root" --password="$mysqlpwd" --execute="DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
   mysql --user="root" --password="$mysqlpwd" --execute="FLUSH PRIVILEGES;"
 
   # create simpleinvoices database, grant privileges, etc
