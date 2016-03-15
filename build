@@ -38,7 +38,7 @@ then
   wget https://bitbucket.org/simpleinvoices/simpleinvoices/downloads/simpleinvoices.2011.1.zip
 
   # update and install lamp-server unzip
-  apt-get update && apt-get -y install unzip apache2 mysql-server php5 php-pear php5-mysql phpmyadmin
+  apt-get update && apt-get -y install unzip apache2 mysql-server php5 php-pear php5-mysql phpmyadmin php5-xsl
 
   # unzip simpleinvoices2011.1 to /var/www/html
   unzip simpleinvoices.2011.1.zip -d /var/www/
