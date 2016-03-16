@@ -1,0 +1,204 @@
+#!/bin/bash
+###############################################################################################################
+# author: milesgratz
+# website: serveradventures.com
+# purpose: script to automate building SimpleInvoices web server on DigitalOcean droplet 
+# links: https://github.com/simpleinvoices/simpleinvoices
+# links: http://simpleinvoices.org/install
+################################################################################################################
+
+# set variables for totally automated script
+mysqlpwd=''
+
+# determine OS 
+dist=$(lsb_release -si)
+ver=$(lsb_release -sr | cut -d. -f1)  
+
+# check if Ubuntu 14+ or Debian 8+
+if ([ $dist == 'Ubuntu' ] && ( [ $ver == '14' ] || [ $ver == '15' ] )) || ( [ $dist == 'Debian' ] && [ $ver == '8' ] )
+then
+  # detected compatible operating system
+  echo '===================================================='
+  echo 'Operating System: Ubuntu 14+ or Debian 8+'
+  echo 
+  echo   'Starting installation...'
+  echo '===================================================='
+  echo 
+
+  # define mysql root password
+  read -p "Please specify MySQL root password: " mysqlpwd
+
+  # check if mysqlpwd was already defined, otherwise define it
+  if [ -z "$mysqlpwd" ]; 
+  then 
+    read -p "Please specify a MySQL database password: " mysqlpwd
+    if [ -z "$mysqlpwd" ];
+      then
+        echo '===================================================='
+        echo 'Database password cannot be null. Exiting...'
+        echo '===================================================='
+      exit
+    fi
+  fi
+  
+  # echo mysql root password to /var/cache/debconf/passwords.dat to prevent 'mysql-server' and 'phpmyadmin' prompting for root password
+  echo "mysql-server mysql-server/root_password password $mysqlpwd" | debconf-set-selections
+  echo "mysql-server mysql-server/root_password_again password $mysqlpwd" | debconf-set-selections
+  echo "phpmyadmin phpmyadmin/dbconfig-install boolean true" | debconf-set-selections
+  echo "phpmyadmin phpmyadmin/app-password-confirm password $mysqlpwd" | debconf-set-selections
+  echo "phpmyadmin phpmyadmin/mysql/admin-pass password $mysqlpwd" | debconf-set-selections
+  echo "phpmyadmin phpmyadmin/mysql/app-pass password $mysqlpwd" | debconf-set-selections
+  echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2" | debconf-set-selections
+
+  # download simpleinvoices2013.1.beta.7 zip
+  wget https://bitbucket.org/simpleinvoices/simpleinvoices/downloads/simpleinvoices.2013.1.beta.7.zip
+
+  # update and install required packages
+  apt-get update && apt-get -y install unzip apache2 mysql-server php5 php-pear php5-mysql phpmyadmin php5-xsl
+
+  # unzip simpleinvoices2011.1 to /var/www/html
+  unzip simpleinvoices.2013.1.beta.7.zip -d /var/www/
+
+  # grant privileges to apache2 user (www-data) to /var/www/simpleinvoices
+  chown -R www-data:www-data /var/www/simpleinvoices
+
+  # run "mysql_secure_installation"
+  mysql --user="root" --password="$mysqlpwd" --execute="UPDATE mysql.user SET Password=PASSWORD('$mysqlpwd') WHERE User='root'"
+  mysql --user="root" --password="$mysqlpwd" --execute="DELETE FROM mysql.user WHERE User='root' AND Host NOT IN ('localhost', '127.0.0.1', '::1')"
+  mysql --user="root" --password="$mysqlpwd" --execute="DELETE FROM mysql.user WHERE User=''"
+  mysql --user="root" --password="$mysqlpwd" --execute="DELETE FROM mysql.db WHERE Db='test' OR Db='test\_%'"
+  mysql --user="root" --password="$mysqlpwd" --execute="FLUSH PRIVILEGES;"
+
+  # create simpleinvoices database, grant privileges, etc
+  mysql --user="root" --password="$mysqlpwd" --execute="CREATE DATABASE simple_invoices;"
+  mysql --user="root" --password="$mysqlpwd" --execute="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP ON simple_invoices.* TO 'simple_invoices'@'localhost' IDENTIFIED BY '$mysqlpwd';"
+  mysql --user="root" --password="$mysqlpwd" --execute="FLUSH PRIVILEGES;"
+
+  # create simpleinvoices.conf in /etc/apache2/sites-available
+  cd /etc/apache2/sites-available
+  echo '<VirtualHost *:80>' >> simpleinvoices.conf
+  echo '      # The ServerName directive sets the request scheme, hostname and port that' >> simpleinvoices.conf
+  echo '      # the server uses to identify itself. This is used when creating' >> simpleinvoices.conf
+  echo '      # redirection URLs. In the context of virtual hosts, the ServerName' >> simpleinvoices.conf
+  echo '      # specifies what hostname must appear in the request'\''s Host: header to' >> simpleinvoices.conf
+  echo '      # match this virtual host. For the default virtual host (this file) this' >> simpleinvoices.conf
+  echo '      # value is not decisive as it is used as a last resort host regardless.' >> simpleinvoices.conf
+  echo '      # However, you must set it for any further virtual host explicitly.' >> simpleinvoices.conf
+  echo '      #ServerName www.example.com' >> simpleinvoices.conf
+  echo '' >> simpleinvoices.conf
+  echo '      ServerAdmin webmaster@localhost' >> simpleinvoices.conf
+  echo '      DocumentRoot /var/www/simpleinvoices' >> simpleinvoices.conf
+  echo '' >> simpleinvoices.conf
+  echo '      #Allow .htaccess files to override' >> simpleinvoices.conf
+  echo '      <Directory /var/www/simpleinvoices>' >> simpleinvoices.conf
+  echo '            Options FollowSymLinks' >> simpleinvoices.conf
+  echo '            AllowOverride All' >> simpleinvoices.conf
+  echo '        #Block access to reading .htaccess files' >> simpleinvoices.conf
+  echo '        <Files ~ "^\.ht">' >> simpleinvoices.conf
+  echo '             Order allow,deny' >> simpleinvoices.conf
+  echo '             Deny from all' >> simpleinvoices.conf
+  echo '             Satisfy all' >> simpleinvoices.conf
+  echo '        </Files>' >> simpleinvoices.conf
+  echo '      </Directory>' >> simpleinvoices.conf
+  echo '' >> simpleinvoices.conf
+  echo '      # Available loglevels: trace8, ..., trace1, debug, info, notice, warn,' >> simpleinvoices.conf
+  echo '      # error, crit, alert, emerg.' >> simpleinvoices.conf
+  echo '      # It is also possible to configure the loglevel for particular' >> simpleinvoices.conf
+  echo '      # modules, e.g.' >> simpleinvoices.conf >> simpleinvoices.conf
+  echo '      #LogLevel info ssl:warn' >> simpleinvoices.conf >> simpleinvoices.conf
+  echo '' >> simpleinvoices.conf
+  echo '      ErrorLog ${APACHE_LOG_DIR}/error.log' >> simpleinvoices.conf
+  echo '      CustomLog ${APACHE_LOG_DIR}/access.log combined' >> simpleinvoices.conf
+  echo '' >> simpleinvoices.conf
+  echo '      # For most configuration files from conf-available/, which are' >> simpleinvoices.conf
+  echo '      # enabled or disabled at a global level, it is possible to' >> simpleinvoices.conf
+  echo '      # include a line for only one particular virtual host. For example the' >> simpleinvoices.conf
+  echo '      # following line enables the CGI configuration for this host only' >> simpleinvoices.conf
+  echo '      # after it has been globally disabled with "a2disconf".' >> simpleinvoices.conf
+  echo '      #Include conf-available/serve-cgi-bin.conf' >> simpleinvoices.conf
+  echo '</VirtualHost>' >> simpleinvoices.conf
+
+  # enable rewrite (.htaccess)
+  a2enmod rewrite
+
+  # create .htaccess files to prevent viewing simpleinvoices directories
+  echo "Options -Indexes" > /var/www/simpleinvoices/.htaccess
+
+  # disable default site (000-default.conf) and enable simpleinvoices.conf
+  a2dissite 000-default
+  a2ensite simpleinvoices
+ 
+  # enable php5-mcrypt extension
+  php5enmod mcrypt
+
+  # fix mysql password for simpleinvoices config.php
+  sed -i -e "s|''|'$mysqlpwd'|g" /var/www/simpleinvoices/config/config.php
+
+  # fix mysql username to be 'simple_invoices' for simpleinvoices config.php
+  sed -i -e 's/root/simple_invoices/g' /var/www/simpleinvoices/config/config.php
+
+  # enable authentication for simpleinvoices config.php
+  sed -i -e '0,/false/s/false/true/' /var/www/simpleinvoices/config/config.php
+
+  # update username/password for phpmyadmin config.inc.php
+  sed -i -e 's|$dbuser|root|g' /etc/phpmyadmin/config.inc.php
+  sed -i -e "s|\$dbpwd|$mysqlpwd|g" /etc/phpmyadmin/config.inc.php
+
+  # fix bizarre issue with 2013.1.beta.7 release database import
+  cd /var/www/simpleinvoices/databases/mysql
+  head -n 161 Full_Simple_Invoices.sql > Full_Simple_Invoices_topsplit.sql
+  tail -n +162 Full_Simple_Invoices.sql > Full_Simple_Invoices_bottomsplit.sql
+  echo '  UNIQUE KEY `UnqInvTax` (`invoice_item_id`, `tax_id`)' >> Full_Simple_Invoices_topsplit.sql
+  cat Full_Simple_Invoices_topsplit.sql Full_Simple_Invoices_bottomsplit.sql > Full_Simple_Invoices_custom.sql
+  rm Full_Simple_Invoices*split.sql
+
+  # commenting out all the SimpleInvoices demo invoices/billers/etc
+  sed -i -e '32a\/*' Full_Simple_Invoices_custom.sql
+  sed -i -e '38a\*/' Full_Simple_Invoices_custom.sql
+  sed -i -e '116a\/*' Full_Simple_Invoices_custom.sql
+  sed -i -e '121a\*/' Full_Simple_Invoices_custom.sql
+  sed -i -e '168a\/*' Full_Simple_Invoices_custom.sql
+  sed -i -e '175a\*/' Full_Simple_Invoices_custom.sql
+  sed -i -e '194a\/*' Full_Simple_Invoices_custom.sql
+  sed -i -e '201a\*/' Full_Simple_Invoices_custom.sql
+  sed -i -e '236a\/*' Full_Simple_Invoices_custom.sql
+  sed -i -e '239a\*/' Full_Simple_Invoices_custom.sql
+  sed -i -e '331a\/*' Full_Simple_Invoices_custom.sql
+  sed -i -e '338a\*/' Full_Simple_Invoices_custom.sql
+  sed -i -e '360a\/*' Full_Simple_Invoices_custom.sql
+  sed -i -e '364a\*/' Full_Simple_Invoices_custom.sql
+  sed -i -e '374a\/*' Full_Simple_Invoices_custom.sql
+  sed -i -e '381a\*/' Full_Simple_Invoices_custom.sql  
+  
+  # change default username from demo@simpleinvoices.org to $(hostname)@digitalocean.com
+  sed -i -e "s|demo\@simpleinvoices\.org|$(hostname)\@digitalocean.com|g" Full_Simple_Invoices_custom.sql
+
+  # create required database tables
+  mysql --user="simple_invoices" --password="$mysqlpwd" simple_invoices < Full_Simple_Invoices_custom.sql
+
+  # restart apache2
+  service apache2 restart
+   
+  # define IP address of server
+  ip=$(ip addr | grep 'state UP' -A2 | tail -n1 | awk '{print $2}' | cut -f1  -d'/')
+
+  # script is finished
+  echo '========================================================================'
+  echo 'SimpleInvoices has been installed. Default login below:' 
+  echo
+  echo "  Website URL:     http://$ip"
+  echo "  Email address:   $(hostname)@digitalocean.com"
+  echo '  Password:        demo'
+  echo
+  echo "  Database URL:    http://$ip/phpmyadmin"
+  echo '  Username:        root'
+  echo "  Password:        $mysqlpwd"  
+  echo '========================================================================'
+
+else
+  # could not find compatible operating system
+  echo '========================================================================'
+  echo 'ERROR. Could not detect compatible operating system...' 		
+  echo '========================================================================'
+
+fi
