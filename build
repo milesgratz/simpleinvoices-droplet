@@ -81,20 +81,18 @@ then
   echo '' >> simpleinvoices.conf
   echo '      ServerAdmin webmaster@localhost' >> simpleinvoices.conf
   echo '      DocumentRoot /var/www/simpleinvoices' >> simpleinvoices.conf
-  echo '      <Directory />' >> simpleinvoices.conf
+  echo '' >> simpleinvoices.conf
+  echo '      #Allow .htaccess files to override' >> simpleinvoices.conf
+  echo '      <Directory /var/www/simpleinvoices>' >> simpleinvoices.conf
   echo '            Options FollowSymLinks' >> simpleinvoices.conf
-  echo '            AllowOverride None' >> simpleinvoices.conf
-  echo '      </Directory>' >> simpleinvoices.conf
-  echo '      <Directory /var/www/>' >> simpleinvoices.conf
-  echo '             Options Indexes FollowSymLinks MultiViews' >> simpleinvoices.conf
-  echo '             AllowOverride None' >> simpleinvoices.conf
+  echo '            AllowOverride All' >> simpleinvoices.conf
+  echo '        #Block access to reading .htaccess files' >> simpleinvoices.conf
+  echo '        <Files ~ "^\.ht">' >> simpleinvoices.conf
   echo '             Order allow,deny' >> simpleinvoices.conf
-  echo '             allow from all' >> simpleinvoices.conf
+  echo '             Deny from all' >> simpleinvoices.conf
+  echo '             Satisfy all' >> simpleinvoices.conf
+  echo '        </Files>' >> simpleinvoices.conf
   echo '      </Directory>' >> simpleinvoices.conf
-  echo '      <Files config.ini>' >> simpleinvoices.conf
-  echo '             order allow,deny' >> simpleinvoices.conf
-  echo '             deny from all' >> simpleinvoices.conf
-  echo '      </Files>' >> simpleinvoices.conf
   echo '' >> simpleinvoices.conf
   echo '      # Available loglevels: trace8, ..., trace1, debug, info, notice, warn,' >> simpleinvoices.conf
   echo '      # error, crit, alert, emerg.' >> simpleinvoices.conf
@@ -112,6 +110,12 @@ then
   echo '      # after it has been globally disabled with "a2disconf".' >> simpleinvoices.conf
   echo '      #Include conf-available/serve-cgi-bin.conf' >> simpleinvoices.conf
   echo '</VirtualHost>' >> simpleinvoices.conf
+
+  # enable rewrite (.htaccess)
+  a2enmod rewrite
+
+  # create .htaccess files to prevent viewing simpleinvoices directories
+  echo "Options -Indexes" > /var/www/simpleinvoices/.htaccess
 
   # disable default site (000-default.conf) and enable simpleinvoices.conf
   a2dissite 000-default
