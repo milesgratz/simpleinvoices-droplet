@@ -7,6 +7,11 @@
 # links: http://simpleinvoices.org/install
 ################################################################################################################
 
+# set variables for totally automated script
+mysqlpwd=''
+domain=''
+email=''
+
 # determine OS 
 dist=$(lsb_release -si)
 ver=$(lsb_release -sr | cut -d. -f1)  
@@ -22,18 +27,45 @@ then
   echo '===================================================='
   echo 
 
-  # define mysql root password
-  read -p "Please specify MySQL root password: " mysqlpwd
-
-  # confirm database password is not null
-  if [ -z "$mysqlpwd" ];
-  then
-    echo '===================================================='
-    echo 'Database password cannot be null. Exiting...'
-    echo '===================================================='
-    exit
+  # check if mysqlpwd was already defined, otherwise define it
+  if [ -z "$mysqlpwd" ]; 
+  then 
+    read -p "Please specify a MySQL database password: " mysqlpwd
+    if [ -z "$mysqlpwd" ];
+      then
+        echo '===================================================='
+        echo 'Database password cannot be null. Exiting...'
+        echo '===================================================='
+      exit
+    fi
   fi
-  
+
+  # check if domain name was already defined, otherwise define it
+  if [ -z "$domain" ];
+  then 
+    read -p "Please server domain name: " domain
+    if [ -z "$domain" ];
+      then
+        echo '===================================================='
+        echo 'Domain name cannot be null. Exiting...'
+        echo '===================================================='
+      exit
+    fi
+  fi 
+
+  # check if email was already defined, otherwise define it
+  if [ -z "$email" ];
+  then 
+    read -p "Please enter email address for authorizing LetsEncrypt: " email
+    if [ -z "$email" ];
+      then
+        echo '===================================================='
+        echo 'Email address cannot be null. Exiting...'
+        echo '===================================================='
+      exit
+    fi
+  fi 
+
   # echo mysql root password to /var/cache/debconf/passwords.dat to prevent 'mysql-server' and 'phpmyadmin' prompting for root password
   echo "mysql-server mysql-server/root_password password $mysqlpwd" | debconf-set-selections
   echo "mysql-server mysql-server/root_password_again password $mysqlpwd" | debconf-set-selections
@@ -47,7 +79,7 @@ then
   wget https://bitbucket.org/simpleinvoices/simpleinvoices/downloads/simpleinvoices.2013.1.beta.7.zip
 
   # update and install required packages
-  apt-get update && apt-get -y install unzip apache2 mysql-server php5 php-pear php5-mysql phpmyadmin php5-xsl
+  apt-get update && apt-get -y install unzip apache2 mysql-server php5 php-pear php5-mysql phpmyadmin php5-xsl git
 
   # unzip simpleinvoices2011.1 to /var/www/html
   unzip simpleinvoices.2013.1.beta.7.zip -d /var/www/
@@ -67,9 +99,36 @@ then
   mysql --user="root" --password="$mysqlpwd" --execute="GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, DROP ON simple_invoices.* TO 'simple_invoices'@'localhost' IDENTIFIED BY '$mysqlpwd';"
   mysql --user="root" --password="$mysqlpwd" --execute="FLUSH PRIVILEGES;"
 
+  # download LetsEncrypt from git
+  git clone https://github.com/letsencrypt/letsencrypt /opt/letsencrypt
+
+  # create LetsEncrypt config file
+  echo 'authenticator = standalone' >> /opt/letsencrypt/$(hostname).ini 
+  echo 'webroot-path = /var/www/simpleinvoices' >> /opt/letsencrypt/$(hostname).ini
+  echo 'renew-by-default' >> /opt/letsencrypt/$(hostname).ini
+  echo 'agree-tos' >> /opt/letsencrypt/$(hostname).ini
+  echo "email = $email" >> /opt/letsencrypt/$(hostname).ini
+  echo "domain = $domain" >> /opt/letsencrypt/$(hostname).ini
+
+  # create LetsEncrypt certificate
+  service apache2 stop 
+  /opt/letsencrypt/letsencrypt-auto certonly --config /opt/letsencrypt/$(hostname).ini
+
   # create simpleinvoices.conf in /etc/apache2/sites-available
   cd /etc/apache2/sites-available
   echo '<VirtualHost *:80>' >> simpleinvoices.conf
+  echo "      ServerName $domain" >> simpleinvoices.conf
+  echo '      DocumentRoot /var/www/simpleinvoices' >> simpleinvoices.conf
+  echo '      # disable .htaccess override' >> simpleinvoices.conf      
+  echo '      <Directory /var/www/simpleinvoices>' >> simpleinvoices.conf
+  echo '            AllowOverride None' >> simpleinvoices.conf
+  echo '      </Directory>' >> simpleinvoices.conf
+  echo '' >> simpleinvoices.conf
+  echo '      # redirect to https' >> simpleinvoices.conf
+  echo "      Redirect / https://$domain" >> simpleinvoices.conf
+  echo '</VirtualHost>' >> simpleinvoices.conf
+  echo '' >> simpleinvoices.conf
+  echo '<VirtualHost *:443>' >> simpleinvoices.conf
   echo '      # The ServerName directive sets the request scheme, hostname and port that' >> simpleinvoices.conf
   echo '      # the server uses to identify itself. This is used when creating' >> simpleinvoices.conf
   echo '      # redirection URLs. In the context of virtual hosts, the ServerName' >> simpleinvoices.conf
@@ -79,8 +138,15 @@ then
   echo '      # However, you must set it for any further virtual host explicitly.' >> simpleinvoices.conf
   echo '      #ServerName www.example.com' >> simpleinvoices.conf
   echo '' >> simpleinvoices.conf
+  echo "      ServerName $domain" >> simpleinvoices.conf
   echo '      ServerAdmin webmaster@localhost' >> simpleinvoices.conf
   echo '      DocumentRoot /var/www/simpleinvoices' >> simpleinvoices.conf
+  echo '' >> simpleinvoices.conf
+  echo '      # define LetsEncrypt SSL certificates' >> simpleinvoices.conf
+  echo '      SSLEngine On' >> simpleinvoices.conf
+  echo "      SSLCertificateKeyFile /etc/letsencrypt/live/$domain/privkey.pem" >> simpleinvoices.conf
+  echo "      SSLCertificateFile /etc/letsencrypt/live/$domain/cert.pem" >> simpleinvoices.conf
+  echo "      SSLCertificateChainFile /etc/letsencrypt/live/$domain/chain.pem" >> simpleinvoices.conf
   echo '' >> simpleinvoices.conf
   echo '      #Allow .htaccess files to override' >> simpleinvoices.conf
   echo '      <Directory /var/www/simpleinvoices>' >> simpleinvoices.conf
@@ -111,9 +177,12 @@ then
   echo '      #Include conf-available/serve-cgi-bin.conf' >> simpleinvoices.conf
   echo '</VirtualHost>' >> simpleinvoices.conf
 
+  # enable SSL mod (HTTPS)
+  a2enmod ssl
+
   # enable rewrite (.htaccess)
   a2enmod rewrite
-
+ 
   # create .htaccess files to prevent viewing simpleinvoices directories
   echo "Options -Indexes" > /var/www/simpleinvoices/.htaccess
 
