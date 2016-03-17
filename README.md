@@ -1,5 +1,5 @@
 # SimpleInvoices-droplet
-Bash script to build and configure SimpleInvoices on Ubuntu/Debian (designed for a DigitalOcean "Droplet")
+Bash script to install and configure SimpleInvoices (simpleinvoices.org)
 
 # Installation Instructions
 After launching a fresh DigitalOcean "Droplet" running Ubuntu 14.04, Ubuntu 15.10, or Debian 8.3:
