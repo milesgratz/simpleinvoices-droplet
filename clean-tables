@@ -1,0 +1,36 @@
+#!/bin/bash
+###############################################################################################################
+# author: milesgratz
+# website: serveradventures.com
+# purpose: bash script to clear user submissions in milesgratz.com/simpleinvoices (demo site)
+################################################################################################################
+
+# define mysqlpwd
+mysqlpwd='password'
+
+# drop si_biller
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_biller;"
+
+# drop si_customers
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_customers;"
+
+# drop si_inventory
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_inventory;"
+
+# drop si_invoices, si_invoice_items, si_invoice_item_tax, si_invoice_type
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_invoices;"
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_invoice_items;"
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_invoice_item_tax;"
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_invoice_type;"
+
+# drop si_payment, si_payment_types
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_payment;"
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_payment_types;"
+
+# drop si_products, si_products_attributes, si_products_values
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_products;"
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_products_attributes;"
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_products_values;"
+
+# drop si_tax 
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_tax;"
