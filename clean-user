@@ -1,0 +1,19 @@
+#!/bin/bash
+###############################################################################################################
+# author: milesgratz
+# website: serveradventures.com
+# purpose: bash script to clear all users and recreate default user in milesgratz.com/simpleinvoices (demo website)
+# crontab: 1 * * * * bash /opt/clean_user
+################################################################################################################
+
+# define mysqlpwd
+mysqlpwd='password'
+
+# drop si_user
+mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_user;"
+
+# recreate user
+cd /root/
+echo "INSERT INTO \`si_user\` (\`id\`, \`email\`, \`role_id\`, \`domain_id\`, \`password\`, \`enabled\`) VALUES (3, 'user', 1, 1, 'fe01ce2a7fbac8fafaed7c982a04e229', 1);" > si_user.sql
+mysql --user="root" --password="$mysqlpwd" simple_invoices < si_user.sql
+rm si_user.sql
