@@ -3,7 +3,7 @@
 # author: milesgratz
 # website: serveradventures.com
 # purpose: bash script to clear all users and recreate default user in milesgratz.com/simpleinvoices (demo website)
-# crontab: 1 * * * * bash /opt/clean_user
+# crontab: * * * * * bash /opt/clean_user
 ################################################################################################################
 
 # define mysqlpwd
