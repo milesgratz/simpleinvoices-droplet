@@ -2,7 +2,8 @@
 ###############################################################################################################
 # author: milesgratz
 # website: serveradventures.com
-# purpose: script to automate building SimpleInvoices web server on DigitalOcean droplet 
+# purpose: script to automate building SimpleInvoices web server on DigitalOcean droplet (HTTP only)
+# links: https://github.com/milesgratz/simpleinvoices-droplet
 # links: https://github.com/simpleinvoices/simpleinvoices
 # links: http://simpleinvoices.org/install
 ################################################################################################################
@@ -24,9 +25,6 @@ then
   echo   'Starting installation...'
   echo '===================================================='
   echo 
-
-  # define mysql root password
-  read -p "Please specify MySQL root password: " mysqlpwd
 
   # check if mysqlpwd was already defined, otherwise define it
   if [ -z "$mysqlpwd" ]; 
@@ -50,14 +48,11 @@ then
   echo "phpmyadmin phpmyadmin/mysql/app-pass password $mysqlpwd" | debconf-set-selections
   echo "phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2" | debconf-set-selections
 
-  # download simpleinvoices2013.1.beta.7 zip
-  wget https://bitbucket.org/simpleinvoices/simpleinvoices/downloads/simpleinvoices.2013.1.beta.7.zip
-
   # update and install required packages
-  apt-get update && apt-get -y install unzip apache2 mysql-server php5 php-pear php5-mysql phpmyadmin php5-xsl
+  apt-get update && apt-get -y install unzip apache2 mysql-server php5 php-pear php5-mysql phpmyadmin php5-xsl git
 
-  # unzip simpleinvoices2011.1 to /var/www/html
-  unzip simpleinvoices.2013.1.beta.7.zip -d /var/www/
+  # download simpleinvoices from github to /var/www/simpleinvoices
+  git clone --recursive https://github.com/simpleinvoices/simpleinvoices /var/www/simpleinvoices
 
   # grant privileges to apache2 user (www-data) to /var/www/simpleinvoices
   chown -R www-data:www-data /var/www/simpleinvoices
@@ -144,37 +139,24 @@ then
   sed -i -e 's|$dbuser|root|g' /etc/phpmyadmin/config.inc.php
   sed -i -e "s|\$dbpwd|$mysqlpwd|g" /etc/phpmyadmin/config.inc.php
 
-  # fix bizarre issue with 2013.1.beta.7 release database import
-  cd /var/www/simpleinvoices/databases/mysql
-  head -n 161 Full_Simple_Invoices.sql > Full_Simple_Invoices_topsplit.sql
-  tail -n +162 Full_Simple_Invoices.sql > Full_Simple_Invoices_bottomsplit.sql
-  echo '  UNIQUE KEY `UnqInvTax` (`invoice_item_id`, `tax_id`)' >> Full_Simple_Invoices_topsplit.sql
-  cat Full_Simple_Invoices_topsplit.sql Full_Simple_Invoices_bottomsplit.sql > Full_Simple_Invoices_custom.sql
-  rm Full_Simple_Invoices*split.sql
-
-  # commenting out all the SimpleInvoices demo invoices/billers/etc
-  sed -i -e '32a\/*' Full_Simple_Invoices_custom.sql
-  sed -i -e '38a\*/' Full_Simple_Invoices_custom.sql
-  sed -i -e '116a\/*' Full_Simple_Invoices_custom.sql
-  sed -i -e '121a\*/' Full_Simple_Invoices_custom.sql
-  sed -i -e '168a\/*' Full_Simple_Invoices_custom.sql
-  sed -i -e '175a\*/' Full_Simple_Invoices_custom.sql
-  sed -i -e '194a\/*' Full_Simple_Invoices_custom.sql
-  sed -i -e '201a\*/' Full_Simple_Invoices_custom.sql
-  sed -i -e '236a\/*' Full_Simple_Invoices_custom.sql
-  sed -i -e '239a\*/' Full_Simple_Invoices_custom.sql
-  sed -i -e '331a\/*' Full_Simple_Invoices_custom.sql
-  sed -i -e '338a\*/' Full_Simple_Invoices_custom.sql
-  sed -i -e '360a\/*' Full_Simple_Invoices_custom.sql
-  sed -i -e '364a\*/' Full_Simple_Invoices_custom.sql
-  sed -i -e '374a\/*' Full_Simple_Invoices_custom.sql
-  sed -i -e '381a\*/' Full_Simple_Invoices_custom.sql  
-  
   # change default username from demo@simpleinvoices.org to $(hostname)@digitalocean.com
-  sed -i -e "s|demo\@simpleinvoices\.org|$(hostname)\@digitalocean.com|g" Full_Simple_Invoices_custom.sql
+  cd /var/www/simpleinvoices/databases/mysql
+  sed -i -e "s|demo\@simpleinvoices\.org|$(hostname)\@digitalocean.com|g" Full_Simple_Invoices.sql
 
-  # create required database tables
-  mysql --user="simple_invoices" --password="$mysqlpwd" simple_invoices < Full_Simple_Invoices_custom.sql
+  # create required database tables from source
+  cd /var/www/simpleinvoices/databases/mysql
+  mysql --user="simple_invoices" --password="$mysqlpwd" simple_invoices < Full_Simple_Invoices.sql
+
+  # drop unwanted "demo" tables 
+  mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_biller;"
+  mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_customers;"
+  mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_inventory;"
+  mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_invoices;"
+  mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_invoice_items;"
+  mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_payment;"
+  mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_products;"
+  mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_products_attributes;"
+  mysql --user="root" --password="$mysqlpwd" --execute "TRUNCATE TABLE simple_invoices.si_products_values;"
 
   # restart apache2
   service apache2 restart
