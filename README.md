@@ -6,6 +6,9 @@ Bash script to install and configure SimpleInvoices (simpleinvoices.org)
 &emsp;<b>Username</b>: &emsp;&emsp;user<br>
 &emsp;<b>Password</b>: &emsp;&emsp;demo<br>
 
+<img src=http://i.imgur.com/GKxHulD.png>
+
+
 # Installation Instructions
 After launching a fresh DigitalOcean "Droplet" running Ubuntu 14.04, Ubuntu 15.10, or Debian 8.3:
 
@@ -13,3 +16,5 @@ After launching a fresh DigitalOcean "Droplet" running Ubuntu 14.04, Ubuntu 15.1
       bash simpleinvoices-droplet
 
 <b>Note:</b> The code is downloaded directly from GitHub. As a best practice, you should inspect the code before executing it.
+
+
